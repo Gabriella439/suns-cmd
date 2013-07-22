@@ -17,14 +17,14 @@ import Data.UUID.V4 (nextRandom)
 import Network (withSocketsDo)
 import Network.AMQP
 import Options.Applicative
-
-type Seed = Int
+import qualified Filesystem.Path.CurrentOS as F
 
 data Options = Options
     { hostName  :: String
     , rmsd      :: Double
     , numStruct :: Int
-    , seed      :: Seed
+    , seed      :: Int
+    , directory :: F.FilePath
     }
 
 options :: Parser Options
@@ -61,13 +61,22 @@ options = Options
         , metavar "INT"
         , help "Randomization seed"
         ] )
+    <*> nullOption (mconcat
+        [ short 'd'
+        , long "directory"
+        , value "."
+        , showDefaultWith F.encodeString
+        , metavar "FILEPATH"
+        , help "Results directory"
+        , reader (Right . F.decodeString)
+        ] )
 
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> options) $ mconcat
     [ fullDesc
-    , header "<header>"
-    , progDesc "Command line client to the Suns search engine"
-    , footer "<footer>"
+    , header "suns-cmd: The Suns search command line client"
+    , progDesc "Send search requests and store results as PDB files"
+    , footer "Report bugs to suns.maintainers@gmail.com"
     ]
 
 requestExchange :: T.Text
@@ -77,7 +86,7 @@ responseExchange :: T.Text
 responseExchange = "suns-exchange-responses"
 
 main = withSocketsDo $ do
-    Options hostName rmsd numStruct seed <- execParser parserInfo
+    Options hostName rmsd numStruct seed directory <- execParser parserInfo
     bracket
         (openConnection hostName "suns-vhost" "suns-client" "suns-client")
         closeConnection
