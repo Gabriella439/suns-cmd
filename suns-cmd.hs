@@ -16,8 +16,11 @@ import Data.UUID (toByteString)
 import Data.UUID.V4 (nextRandom)
 import Network (withSocketsDo)
 import Network.AMQP
+import Network.AMQP.Types (FieldTable(FieldTable))
 import Options.Applicative
 import qualified Filesystem.Path.CurrentOS as F
+import Filesystem.Path ((</>), (<.>))
+import qualified Filesystem as F
 
 data Options = Options
     { hostName  :: String
@@ -30,12 +33,11 @@ data Options = Options
 options :: Parser Options
 options = Options
     <$> strOption (mconcat
-	[ short 'h'
-        , long "hostname"
+	[ long "hostname"
 	, value "suns.degradolab.org"
 	, showDefaultWith id
 	, metavar "STRING"
-	, help "Suns search engine to query"
+	, help "Search engine address"
 	] )
     <*> option (mconcat
         [ short 'r'
@@ -76,7 +78,7 @@ parserInfo = info (helper <*> options) $ mconcat
     [ fullDesc
     , header "suns-cmd: The Suns search command line client"
     , progDesc "Send search requests and store results as PDB files"
-    , footer "Report bugs to suns.maintainers@gmail.com"
+    , footer "Report bugs to suns-search@googlegroups.com"
     ]
 
 requestExchange :: T.Text
@@ -107,11 +109,12 @@ main = withSocketsDo $ do
                 False            -- exchangeAutoDelete
                 False            -- exchangeInternal
             (qName, _, _) <- scriptIO $ declareQueue channel $ QueueOpts
-                ""     -- queueName
-                False  -- queuePassive
-                False  -- queueDurable
-                True   -- queueExclusive
-                True   -- queueAutoDelete
+                ""                    -- queueName
+                False                 -- queuePassive
+                False                 -- queueDurable
+                True                  -- queueExclusive
+                True                  -- queueAutoDelete
+                (FieldTable M.empty)  -- queueHeaders
             scriptIO $ bindQueue channel qName responseExchange qName
             pdb  <- scriptIO B.getContents
             uID  <- scriptIO nextRandom
@@ -119,7 +122,8 @@ main = withSocketsDo $ do
             used <- scriptIO $ newIORef M.empty
             let uIDtxt = T.pack (show uID)
             scriptIO $ bracket
-                (consumeMsgs channel qName Ack (callback uIDtxt mvar used))
+                (consumeMsgs
+                     channel qName Ack (callback uIDtxt mvar used directory) )
                 (cancelConsumer channel)
                 $ \_ -> runScript $ do
                     let msg = newMsg
@@ -139,9 +143,10 @@ callback
     :: T.Text
     -> MVar ()
     -> IORef (M.Map B.ByteString Int)
+    -> F.FilePath
     -> (Message, Envelope)
     -> IO ()
-callback uIDtxt mvar used (message, envelope) = runScript $
+callback uIDtxt mvar used directory (message, envelope) = runScript $
     case (msgCorrelationID message) of
         Nothing                        -> return ()
         Just corrID | corrID /= uIDtxt -> return ()
@@ -155,8 +160,11 @@ callback uIDtxt mvar used (message, envelope) = runScript $
                     m <- scriptIO $ readIORef used
                     let n = maybe 0 id (M.lookup pdbID m)
                     scriptIO $ modifyIORef used (M.insertWith (+) pdbID 1)
-                    let fileName = B.unpack pdbID ++ "_" ++ show n ++ ".pdb"
-                    scriptIO $ B.writeFile fileName match
+                    let fileName =
+                                directory
+                            </> F.decodeString (B.unpack pdbID ++ "_" ++ show n)
+                            <.> "pdb"
+                    scriptIO $ F.writeFile fileName match
                 '2' -> scriptIO $ errLn "Server time limit exceeded"
                 '3' -> scriptIO $ errLn $ "Server Error: " ++ B.unpack rest
                 _   -> scriptIO $ errLn $ invalidErr body
@@ -174,4 +182,3 @@ invalidErr bs = "\
  \following data:\n"
  ++ show (B.take 256 bs)
  ++ if (B.length bs > 256) then "..." else ""
-
