@@ -163,9 +163,15 @@ callback uIDtxt mvar used directory (message, _envelope) = runScript $
                             </> F.decodeString (B.unpack pdbID ++ "_" ++ show n)
                             <.> "pdb"
                     scriptIO $ F.writeFile fileName match
-                '2' -> scriptIO $ errLn "Server time limit exceeded"
-                '3' -> scriptIO $ errLn $ "Server Error: " ++ B.unpack rest
-                _   -> scriptIO $ errLn $ invalidErr body
+                '2' -> scriptIO $ do
+                     errLn "Server time limit exceeded"
+                     putMVar mvar ()
+                '3' -> scriptIO $ do
+                     errLn $ "Server Error: " ++ B.unpack rest
+                     putMVar mvar ()
+                _   -> scriptIO $ do
+                     errLn $ invalidErr body
+                     putMVar mvar ()
 
 emptyErr :: String
 emptyErr = "\
