@@ -1,9 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
-import Control.Error (runScript, fmapL, (!?), (??), scriptIO, tryRight, errLn)
+import Control.Error (runScript, (??), scriptIO, errLn)
 import Control.Exception (bracket)
-import Control.Monad (when)
 import Data.Aeson ((.=), object, encode)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
@@ -11,8 +10,6 @@ import Data.IORef (IORef, newIORef, readIORef, modifyIORef)
 import qualified Data.Map as M
 import Data.Monoid (mconcat)
 import qualified Data.Text as T
-import Data.Text.Lazy (toStrict)
-import Data.UUID (toByteString)
 import Data.UUID.V4 (nextRandom)
 import Network (withSocketsDo)
 import Network.AMQP
@@ -23,11 +20,11 @@ import Filesystem.Path ((</>), (<.>))
 import qualified Filesystem as F
 
 data Options = Options
-    { hostName  :: String
-    , rmsd      :: Double
-    , numStruct :: Int
-    , seed      :: Int
-    , directory :: F.FilePath
+    { _hostName  :: String
+    , _rmsd      :: Double
+    , _numStruct :: Int
+    , _seed      :: Int
+    , _directory :: F.FilePath
     }
 
 options :: Parser Options
@@ -87,6 +84,7 @@ requestExchange = "suns-exchange-requests"
 responseExchange :: T.Text
 responseExchange = "suns-exchange-responses"
 
+main :: IO ()
 main = withSocketsDo $ do
     Options hostName rmsd numStruct seed directory <- execParser parserInfo
     bracket
@@ -146,7 +144,7 @@ callback
     -> F.FilePath
     -> (Message, Envelope)
     -> IO ()
-callback uIDtxt mvar used directory (message, envelope) = runScript $
+callback uIDtxt mvar used directory (message, _envelope) = runScript $
     case (msgCorrelationID message) of
         Nothing                        -> return ()
         Just corrID | corrID /= uIDtxt -> return ()
