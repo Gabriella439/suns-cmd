@@ -2,9 +2,8 @@
 
 module Test where
 
-import Control.Monad (when, forM_)
+import Control.Monad (forM_)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy.Internal as BLI
 import Crypto.Types (BitLength)
 import Data.Digest.Pure.MD5
 import Data.Serialize (encode)
@@ -17,12 +16,8 @@ import Pipes.Lift (evalStateP)
 import qualified Pipes.Prelude as P
 import Pipes.Parse
 import Pipes.Safe
-import Pipes.Safe.Prelude (withFile)
-import qualified System.IO as IO
 import Prelude hiding (readFile, take)
-import System.Directory (readable, getPermissions, doesDirectoryExist)
-import System.FilePath
-import System.Posix (openDirStream, readDirStream, closeDirStream)
+import System.Exit
 
 take
     :: (Monad m, Integral a)
@@ -100,19 +95,19 @@ parameters =
 
 tests :: Producer Bool IO ()
 tests = forM_ parameters $ \(relPath, rmsd, expectation) -> do
+    liftIO $ putStrLn $ "Testing: " ++ relPath
     bs <- liftIO $ expect ("test/" ++ relPath) rmsd
-    liftIO $ print bs
+    liftIO $ putStrLn $ "Expected: " ++ show expectation
+    liftIO $ putStrLn $ "Found   : " ++ show bs
     yield (bs == expectation)
 
+main :: IO ()
 main = do
-    b <- P.and tests
-    print b
-
-{-
-md5Files :: FilePath -> IO BS.ByteString
-md5Files dir =
-      runSafeT
-    $ foldMD5
-    $ splitN (unTagged (blockLength :: Tagged MD5Digest BitLength))
-    $ for (every (childOf dir)) readFile
--}
+    pass <- P.and tests
+    if pass
+        then do
+            putStrLn "All tests passed"
+            exitSuccess
+        else do
+            putStrLn "Test failed"
+            exitFailure
