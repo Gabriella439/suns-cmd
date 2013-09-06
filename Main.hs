@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings, TypeFamilies #-}
 
+module Main where
+
 import Control.Error (errLn)
 import Control.Monad (void)
 import Data.Aeson ((.=), object, encode)
@@ -9,6 +11,7 @@ import Data.IORef (IORef, newIORef, readIORef, modifyIORef)
 import qualified Data.Map as M
 import Data.Monoid (mconcat)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
 import Data.UUID.V4 (nextRandom)
 import qualified Filesystem.Path.CurrentOS as F
@@ -188,9 +191,9 @@ callback uIDtxt used output done (message, _envelope) =
                             let n = maybe 0 id (M.lookup pdbID m)
                             modifyIORef used (M.insertWith (+) pdbID 1)
                             void $ atomically $ send output
-                                ( T.pack (B.unpack pdbID)
+                                ( TE.decodeUtf8 pdbID
                                 , n
-                                , T.pack (B.unpack match)
+                                , TE.decodeUtf8 match
                                 )
                         '2' -> do
                              errLn "Server time limit exceeded"
