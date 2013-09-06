@@ -47,6 +47,7 @@ splitN n p = evalStateP p $ do
         P.fold (\x b -> b:x) [] (BS.concat . reverse) (input >-> take n)
     yield bs
 
+-- FIXME: This drops the last block of the stream (< 512 bytes)
 foldMD5 :: (Monad m) => Producer BS.ByteString m () -> m BS.ByteString
 foldMD5 p =
     P.fold
@@ -86,9 +87,7 @@ parameters =
         "\221Q\n\148\159\135\SOw\\\174k`\223J\131\191"            )
     , ("figure3and4B/search8.pdb", 0.6,
         "\199\216\253B\168\DC1\166\254|\195\147\178\181X\148\SUB" )
-    , ("figure3and4B/search8.pdb", 0.6,
-        "\199\216\253B\168\DC1\166\254|\195\147\178\181X\148\SUB" )
-    , ("figure4A/search1.pdb"    , 0.6,
+    , ("figure4A/search1.pdb"    , 0.7,
         "\163\148\147\234&\134\253x\DC2T\142\134\134\157\SO\160"  )
     ]
 
