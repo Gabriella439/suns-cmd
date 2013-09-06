@@ -6,16 +6,29 @@
 
 Install the [Haskell Platform](http://www.haskell.org/platform/).
 
-    cabal update
-    cabal install
+    $ cabal update
+    $ cabal install
 
 To use `suns-cmd`, just create a directory to store the results:
 
-    mkdir results
+    $ mkdir results
 
-... and feed in the motif to search to the program's standard input:
+... and feed in the motif to search to the program's standard input.  This
+source package provides example motifs in the `test/` subdirectory:
 
-    ~/.cabal/bin/suns-cmd -d results < myMotif.pdb
+    $ ~/.cabal/bin/suns-cmd -d results/ < test/figure2/search1.pdb
+
+The `-d` parameter tells the program to store all results in the `results/`
+directory:
+
+    $ ls results
+    1tqg_0.pdb   1v7w_2.pdb  2fr5_1.pdb  3a6r_0.pdb   3cuz_1.pdb  3fke_0.pdb
+    1tqg_1.pdb   1v7w_3.pdb  2fr5_2.pdb  3a6r_1.pdb   3cuz_2.pdb  3fke_1.pdb
+    ...
+
+Each result is labeled by the structure name followed by a number which
+distinguishes results originating from the same structure.  These results are
+already aligned to the original search query.
 
 ## Testing
 
