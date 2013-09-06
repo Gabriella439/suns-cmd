@@ -1,7 +1,5 @@
 {-# LANGUAGE TypeFamilies, OverloadedStrings #-}
 
-module Test where
-
 import Control.Monad (forM_)
 import qualified Data.ByteString as BS
 import Crypto.Types (BitLength)
@@ -10,7 +8,7 @@ import Data.Serialize (encode)
 import Data.Tagged (Tagged(unTagged))
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
-import Main (search)
+import Network (withSocketsDo)
 import Pipes
 import Pipes.Lift (evalStateP)
 import qualified Pipes.Prelude as P
@@ -18,6 +16,7 @@ import Pipes.Parse
 import Pipes.Safe
 import Prelude hiding (readFile, take)
 import System.Exit
+import Common (search)
 
 take
     :: (Monad m, Integral a)
@@ -102,7 +101,7 @@ tests = forM_ parameters $ \(relPath, rmsd, expectation) -> do
     yield (bs == expectation)
 
 main :: IO ()
-main = do
+main = withSocketsDo $ do
     pass <- P.and tests
     if pass
         then do
