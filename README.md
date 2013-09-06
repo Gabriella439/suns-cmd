@@ -1,4 +1,4 @@
-# suns-cmd v4.0.0
+# suns-cmd v1.0.0
 
 `suns-cmd` is a command line client to the Suns protein search engine.
 
@@ -34,7 +34,7 @@ test input structures in the `test` directory.
 
 ## License (BSD 3-clause)
 
-Copyright (c) 2012, 2013 Gabriel Gonzalez
+Copyright (c) 2013 Gabriel Gonzalez
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
