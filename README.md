@@ -16,7 +16,7 @@ To use `suns-cmd`, just create a directory to store the results:
 ... and feed in the motif to search to the program's standard input.  This
 source package provides example motifs in the `test/` subdirectory:
 
-    $ ~/.cabal/bin/suns-cmd -d results/ < test/figure2/search1.pdb
+    $ ~/.cabal/bin/suns-cmd -d results/ -r 0.2 < test/figure2/search1.pdb
 
 The `-d` parameter tells the program to store all results in the `results/`
 directory:
