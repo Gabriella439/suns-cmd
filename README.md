@@ -45,6 +45,11 @@ This test requires a network connection because it sends the searches to the
 official search engine hosted at `suns.degradolab.org`.  You can find the
 test input structures in the `test` directory.
 
+# Support
+
+To report bugs, request features, or ask for support, contact the official
+mailing list at `suns-search@googlegroups.com`.
+
 ## License (BSD 3-clause)
 
 Copyright (c) 2013 Gabriel Gonzalez
