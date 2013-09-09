@@ -33,7 +33,7 @@ search
     -> T.Text
     -> Producer' (T.Text, Integer, T.Text) m ()
 search hostName rmsd numStruct seed pdb = do
-    (output, input, doneOutput, _) <- liftIO $ spawn' Unbounded
+    (output, input, seal) <- liftIO $ spawn' Unbounded
     bracket
         (openConnection hostName "suns-vhost" "suns-client" "suns-client")
         closeConnection
@@ -69,7 +69,7 @@ search hostName rmsd numStruct seed pdb = do
                      channel
                      qName
                      Ack
-                     (callback uIDtxt used output (atomically doneOutput)) )
+                     (callback uIDtxt used output (atomically seal)) )
                 (cancelConsumer channel)
                 $ \_ -> do
                     let msg = newMsg
