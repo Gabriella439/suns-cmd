@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings, TypeFamilies, RankNTypes #-}
 
 module Common where
 
@@ -46,6 +46,7 @@ search hostName rmsd numStruct seed pdb = do
                 True              -- exchangeDurable
                 False             -- exchangeAutoDelete
                 False             -- exchangeInternal
+                (FieldTable M.empty)  -- queueHeaders
             liftIO $ declareExchange channel $ ExchangeOpts
                 requestExchange  -- exchangeName
                 "direct"         -- exchangeType
@@ -53,6 +54,7 @@ search hostName rmsd numStruct seed pdb = do
                 True             -- exchangeDurable
                 False            -- exchangeAutoDelete
                 False            -- exchangeInternal
+                (FieldTable M.empty)  -- queueHeaders
             (qName, _, _) <- liftIO $ declareQueue channel $ QueueOpts
                 ""                    -- queueName
                 False                 -- queuePassive
