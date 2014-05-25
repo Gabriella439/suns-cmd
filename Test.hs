@@ -4,89 +4,63 @@ import Control.Monad (forM_)
 import qualified Data.ByteString as BS
 import Crypto.Types (BitLength)
 import Data.Digest.Pure.MD5
+import Data.Monoid ((<>))
 import Data.Serialize (encode)
 import Data.Tagged (Tagged(unTagged))
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 import Network (withSocketsDo)
 import Pipes
-import Pipes.Lift (evalStateP)
-import qualified Pipes.Prelude as P
-import Pipes.Parse
-import Prelude hiding (readFile, take)
+import Pipes.ByteString (chunksOf')
+import qualified Pipes.Prelude as Pipes
 import System.Exit
 import Common (search)
-
-take
-    :: (Monad m, Integral a)
-    => a
-    -> Pipe
-        BS.ByteString BS.ByteString (StateT (Producer BS.ByteString m r) m) ()
-take n0 = go n0 where
-    go n
-        | n <= 0 = return ()
-        | otherwise = do
-            bs <- await
-            let len = fromIntegral $ BS.length bs
-            if (len > n)
-                then do
-                    let (prefix, suffix) = BS.splitAt (fromIntegral n) bs
-                    yield prefix
-                    lift (unDraw suffix)
-                else do
-                    yield bs
-                    go (n - len)
-splitN
-    :: (Monad m)
-    => Int
-    -> Producer BS.ByteString m ()
-    -> Producer BS.ByteString m ()
-splitN n p = evalStateP p $ do
-    bs <- lift $
-        P.fold (\x b -> b:x) [] (BS.concat . reverse) (input >-> take n)
-    yield bs
 
 -- FIXME: This drops the last block of the stream (< 512 bytes)
 foldMD5 :: (Monad m) => Producer BS.ByteString m () -> m BS.ByteString
 foldMD5 p =
-    P.fold
+    Pipes.fold
         md5Update
         md5InitialContext
         (\c -> encode $ md5Finalize c BS.empty)
-        (splitN (unTagged (blockLength :: Tagged MD5Digest BitLength)) p)
+        (chunksOf' chunkSize p >-> Pipes.map pad)
+  where
+    chunkSize = unTagged (blockLength :: Tagged MD5Digest BitLength)
+
+    pad bs = bs <> BS.replicate (chunkSize - BS.length bs) 0
 
 expect :: FilePath -> Double -> IO BS.ByteString
 expect file rmsd = do
     txt <- TIO.readFile file
     search "suns.degradolab.org" rmsd 10 0 txt $ \results -> do
-        foldMD5 $ results >-> P.map (\(_, _, pdb) -> TE.encodeUtf8 pdb)
+        foldMD5 $ results >-> Pipes.map (\(_, _, pdb) -> TE.encodeUtf8 pdb)
 
 parameters :: [(FilePath, Double, BS.ByteString)]
 parameters =
     [ ("figure2/search1.pdb"     , 0.2,
-           "\SUB\228s\150\222{T}\182\239\168\158\249p'+"          )
+           "\157k'\201\133yo\166\139\211\139*U\n\180K")
     , ("figure2/search2.pdb"     , 0.2,
-        "\218\230\&2@\173&+\136\146\152\145\162\165SzC"           )
+        "\242\140\DC2-\238\186\196H\155q\SO\201\238p\221\201")
     , ("figure2/search2.pdb"     , 0.3,
-        "'5+q\248\"\207.\243\221\204[\ESC\138\188\161"            )
+        "0\SYNQ\255\152\206\234\229\224\242\US\235\132f\188|")
     , ("figure3and4B/search1.pdb", 0.1,
-        "\251\193\GS\128Oz\224X\197>\200\223\188*\190n"           )
+        "\183\246N\181\169}p\US\241s\169K\209\DLE\214r")
     , ("figure3and4B/search2.pdb", 0.2,
-        "*-\190=y:\255\209\157\239Y\229\195`+\190"                )
+        "~\248U{\170\132\t^\205\221%(\182\137\197{")
     , ("figure3and4B/search3.pdb", 0.2,
-        "\158\151\203\252\DC3\EOT~/\tt\247\152\ESC\NAK\vN"        )
+        "P\225\130|H6\199\SYN\247DJ\ENQ\SO\130^\EM")
     , ("figure3and4B/search4.pdb", 0.5,
-        "\249\236=*\130\167\155\n./3$mn\148}"                     )
+        "\158\243\168\132\167\228D\233Jn\201\174\247q\153\145")
     , ("figure3and4B/search5.pdb", 0.5,
-        "\167\192\241*\178\138\134\246\226\234\139\n:\129\&1\133" )
+        "\tUxD\244\205\158\&2`\182oO\130\200T\219")
     , ("figure3and4B/search6.pdb", 0.5,
-        "P-%\GS\216G\249\184\133\NUL$j\EOT\219*j"                 )
+        "VL\171^\SI4G\241\a\r\149\141\208\226:\255")
     , ("figure3and4B/search7.pdb", 0.5,
-        "\221Q\n\148\159\135\SOw\\\174k`\223J\131\191"            )
+        "T\EM\210v\226\t\n<\212%[\223\226\208KR")
     , ("figure3and4B/search8.pdb", 0.6,
-        "\199\216\253B\168\DC1\166\254|\195\147\178\181X\148\SUB" )
+        "&\a-\222\244\187\ETB\232lH\238\&0\152\205A\199")
     , ("figure4A/search1.pdb"    , 0.7,
-        "\163\148\147\234&\134\253x\DC2T\142\134\134\157\SO\160"  )
+        "\137F\133\234U\211\202\\\153\a\213\225#\211\152k")
     ]
 
 tests :: Producer Bool IO ()
@@ -99,7 +73,7 @@ tests = forM_ parameters $ \(relPath, rmsd, expectation) -> do
 
 main :: IO ()
 main = withSocketsDo $ do
-    pass <- P.and tests
+    pass <- Pipes.and tests
     if pass
         then do
             putStrLn "All tests passed"
