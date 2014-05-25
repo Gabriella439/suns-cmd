@@ -9,7 +9,6 @@ import qualified Filesystem as F
 import Network (withSocketsDo)
 import Options.Applicative
 import Pipes
-import Pipes.Safe
 import Common (search)
 
 data Options = Options
@@ -75,8 +74,7 @@ main :: IO ()
 main = withSocketsDo $ do
     Options hostName rmsd numStruct seed directory <- execParser parserInfo
     query <- TIO.getContents
-    runSafeT $ runEffect $ do
-        let results = search hostName rmsd numStruct seed query
+    search hostName rmsd numStruct seed query $ \results -> runEffect $ do
         for results $ \(pdbID, n, pdbStr) -> liftIO $ do
             let fileName =
                         directory

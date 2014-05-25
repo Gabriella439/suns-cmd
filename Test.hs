@@ -13,7 +13,6 @@ import Pipes
 import Pipes.Lift (evalStateP)
 import qualified Pipes.Prelude as P
 import Pipes.Parse
-import Pipes.Safe
 import Prelude hiding (readFile, take)
 import System.Exit
 import Common (search)
@@ -59,9 +58,8 @@ foldMD5 p =
 expect :: FilePath -> Double -> IO BS.ByteString
 expect file rmsd = do
     txt <- TIO.readFile file
-    runSafeT $ foldMD5 $
-            search "suns.degradolab.org" rmsd 10 0 txt
-        >-> P.map (\(_, _, pdb) -> TE.encodeUtf8 pdb)
+    search "suns.degradolab.org" rmsd 10 0 txt $ \results -> do
+        foldMD5 $ results >-> P.map (\(_, _, pdb) -> TE.encodeUtf8 pdb)
 
 parameters :: [(FilePath, Double, BS.ByteString)]
 parameters =

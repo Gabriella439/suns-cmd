@@ -3,6 +3,7 @@
 module Common where
 
 import Control.Error (errLn)
+import Control.Exception (bracket)
 import Control.Monad (void)
 import Data.Aeson ((.=), object, encode)
 import qualified Data.ByteString.Char8 as B
@@ -15,7 +16,6 @@ import Data.UUID.V4 (nextRandom)
 import Network.AMQP
 import Network.AMQP.Types (FieldTable(FieldTable))
 import Pipes
-import Pipes.Safe
 import Pipes.Concurrent
 
 requestExchange :: T.Text
@@ -25,21 +25,21 @@ responseExchange :: T.Text
 responseExchange = "suns-exchange-responses"
 
 search
-    :: (MonadSafe m, Base m ~ IO)
-    => String
+    :: String
     -> Double
     -> Int
     -> Int
     -> T.Text
-    -> Producer' (T.Text, Integer, T.Text) m ()
-search hostName rmsd numStruct seed pdb = do
-    (output, input, seal) <- liftIO $ spawn' Unbounded
+    -> (Producer' (T.Text, Integer, T.Text) IO () -> IO r)
+    -> IO r
+search hostName rmsd numStruct seed pdb k = do
+    (output, input, seal) <- spawn' Unbounded
     bracket
         (openConnection hostName "suns-vhost" "suns-client" "suns-client")
         closeConnection
         $ \connection -> do
-            channel <- liftIO $ openChannel connection
-            liftIO $ declareExchange channel $ ExchangeOpts
+            channel <- openChannel connection
+            declareExchange channel $ ExchangeOpts
                 responseExchange  -- exchangeName
                 "direct"          -- exchangeType
                 True              -- exchangePassive
@@ -47,7 +47,7 @@ search hostName rmsd numStruct seed pdb = do
                 False             -- exchangeAutoDelete
                 False             -- exchangeInternal
                 (FieldTable M.empty)  -- queueHeaders
-            liftIO $ declareExchange channel $ ExchangeOpts
+            declareExchange channel $ ExchangeOpts
                 requestExchange  -- exchangeName
                 "direct"         -- exchangeType
                 True             -- exchangePassive
@@ -55,16 +55,16 @@ search hostName rmsd numStruct seed pdb = do
                 False            -- exchangeAutoDelete
                 False            -- exchangeInternal
                 (FieldTable M.empty)  -- queueHeaders
-            (qName, _, _) <- liftIO $ declareQueue channel $ QueueOpts
+            (qName, _, _) <- declareQueue channel $ QueueOpts
                 ""                    -- queueName
                 False                 -- queuePassive
                 False                 -- queueDurable
                 True                  -- queueExclusive
                 True                  -- queueAutoDelete
                 (FieldTable M.empty)  -- queueHeaders
-            liftIO $ bindQueue channel qName responseExchange qName
-            uID  <- liftIO nextRandom
-            used <- liftIO $ newIORef M.empty
+            bindQueue channel qName responseExchange qName
+            uID  <- nextRandom
+            used <- newIORef M.empty
             let uIDtxt = T.pack (show uID)
             bracket
                 (consumeMsgs
@@ -84,8 +84,8 @@ search hostName rmsd numStruct seed pdb = do
                             , msgReplyTo = Just qName
                             , msgCorrelationID = Just uIDtxt
                             }
-                    liftIO $ publishMsg channel requestExchange "1.0.0" msg
-                    fromInput input
+                    publishMsg channel requestExchange "1.0.0" msg
+                    k (fromInput input)
 
 callback
     :: T.Text
