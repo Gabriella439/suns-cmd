@@ -1,22 +1,23 @@
 {-# LANGUAGE OverloadedStrings, TypeFamilies #-}
 
+import Control.Monad.Trans.Free (iterT)
 import Data.Monoid (mconcat)
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import qualified Filesystem.Path.CurrentOS as F
 import Filesystem.Path ((</>), (<.>))
 import qualified Filesystem as F
 import Network (withSocketsDo)
 import Options.Applicative
 import Pipes
-import Common (search)
+import Common (search, Step(..))
 
 data Options = Options
-    { _hostName  :: String
-    , _rmsd      :: Double
-    , _numStruct :: Int
-    , _seed      :: Int
-    , _directory :: F.FilePath
+    { _hostName   :: String
+    , _rmsd       :: Double
+    , _numStruct  :: Int
+    , _seed       :: Int
+    , _directory  :: F.FilePath
+    , _inputFiles :: [F.FilePath]
     }
 
 options :: Parser Options
@@ -57,10 +58,14 @@ options = Options
         , long "directory"
         , value "."
         , showDefaultWith F.encodeString
-        , metavar "FILEPATH"
+        , metavar "DIRECTORY"
         , help "Results directory"
         , reader (Right . F.decodeString)
         ] )
+    <*> many (argument (Just . F.decodeString) (mconcat
+        [ metavar "PDBFILE"
+        , help "Input file"
+        ] ))
 
 parserInfo :: ParserInfo Options
 parserInfo = info (helper <*> options) $ mconcat
@@ -72,12 +77,22 @@ parserInfo = info (helper <*> options) $ mconcat
 
 main :: IO ()
 main = withSocketsDo $ do
-    Options hostName rmsd numStruct seed directory <- execParser parserInfo
-    query <- TIO.getContents
-    search hostName rmsd numStruct seed query $ \results -> runEffect $ do
-        for results $ \(pdbID, n, pdbStr) -> liftIO $ do
-            let fileName =
-                        directory
-                    </> F.decodeString (T.unpack pdbID ++ "_" ++ show n)
-                    <.> "pdb"
-            F.writeTextFile fileName pdbStr
+    Options hostName rmsd numStruct seed directory inputFiles <-
+        execParser parserInfo
+    let step (Step filePath p) = do
+            let filePath' = F.decodeString filePath
+                base      = F.basename filePath'
+            m <- runEffect $ for p $ \(pdbID, n, pdbStr) -> liftIO $ do
+                let fileName =
+                            directory
+                        </> base
+                        </> F.decodeString (T.unpack pdbID ++ "_" ++ show n)
+                        <.> "pdb"
+                F.writeTextFile fileName pdbStr
+            m
+    let params =
+            map
+                (\inputFile ->
+                    (rmsd, numStruct, seed, F.encodeString inputFile) )
+                inputFiles
+    search hostName params (iterT step)

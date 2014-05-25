@@ -1,10 +1,11 @@
-{-# LANGUAGE OverloadedStrings, TypeFamilies, RankNTypes #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Common where
 
+import Control.Concurrent.Async (withAsync)
 import Control.Error (errLn)
 import Control.Exception (bracket)
-import Control.Monad (void)
+import Control.Monad (void, forM_)
 import Data.Aeson ((.=), object, encode)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
@@ -13,9 +14,11 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.UUID.V4 (nextRandom)
+import qualified Data.Text.IO as TIO
 import Network.AMQP
 import Network.AMQP.Types (FieldTable(FieldTable))
 import Pipes
+import Pipes.Group
 import Pipes.Concurrent
 
 requestExchange :: T.Text
@@ -26,14 +29,12 @@ responseExchange = "suns-exchange-responses"
 
 search
     :: String
-    -> Double
-    -> Int
-    -> Int
-    -> T.Text
-    -> (Producer' (T.Text, Integer, T.Text) IO () -> IO r)
-    -> IO r
-search hostName rmsd numStruct seed pdb k = do
-    (output, input, seal) <- spawn' Unbounded
+    -> [(Double, Int, Int, FilePath)]
+    -> (FreeT (Step (T.Text, Integer, T.Text) IO) IO () -> IO r)
+    -> IO ()
+search hostName params k = do
+    let filePaths = map (\(_, _, _, filePath) -> filePath) params
+    (output, input, _seal) <- spawn' Unbounded
     bracket
         (openConnection hostName "suns-vhost" "suns-client" "suns-client")
         closeConnection
@@ -71,26 +72,34 @@ search hostName rmsd numStruct seed pdb k = do
                      channel
                      qName
                      Ack
-                     (callback uIDtxt used output (atomically seal)) )
+                     (callback
+                         uIDtxt
+                         used
+                         output
+--                       (atomically seal)
+                         (void $ atomically $ send output Nothing) ) )
                 (cancelConsumer channel)
                 $ \_ -> do
-                    let msg = newMsg
-                            { msgBody = encode $ object
-                                [ "rmsd_cutoff"    .= rmsd
-                                , "num_structures" .= numStruct
-                                , "random_seed"    .= seed
-                                , "atoms"          .= pdb
-                                ]
-                            , msgReplyTo = Just qName
-                            , msgCorrelationID = Just uIDtxt
-                            }
-                    publishMsg channel requestExchange "1.0.0" msg
-                    k (fromInput input)
+                    let io = k (partition filePaths (fromInput input))
+                    withAsync io $ \_ -> do
+                        forM_ params $ \(rmsd, numStruct, seed, filePath) -> do
+                            pdb <- TIO.readFile filePath
+                            let msg = newMsg
+                                    { msgBody = encode $ object
+                                        [ "rmsd_cutoff"    .= rmsd
+                                        , "num_structures" .= numStruct
+                                        , "random_seed"    .= seed
+                                        , "atoms"          .= pdb
+                                        ]
+                                    , msgReplyTo = Just qName
+                                    , msgCorrelationID = Just uIDtxt
+                                    }
+                            publishMsg channel requestExchange "1.0.0" msg
 
 callback
     :: T.Text
     -> IORef (M.Map B.ByteString Integer)
-    -> Output (T.Text, Integer, T.Text)
+    -> Output (Maybe (T.Text, Integer, T.Text))
     -> IO ()
     -> (Message, Envelope)
     -> IO ()
@@ -112,7 +121,7 @@ callback uIDtxt used output done (message, _envelope) =
                             m <- readIORef used
                             let n = maybe 0 id (M.lookup pdbID m)
                             modifyIORef used (M.insertWith (+) pdbID 1)
-                            void $ atomically $ send output
+                            void $ atomically $ send output $ Just
                                 ( TE.decodeUtf8 pdbID
                                 , n
                                 , TE.decodeUtf8 match
@@ -126,6 +135,42 @@ callback uIDtxt used output done (message, _envelope) =
                         _   -> do
                              errLn $ invalidErr body
                              done
+
+data Step a m x = Step FilePath (Producer a m x)
+
+instance Monad m => Functor (Step a m) where
+    fmap f (Step filePath producer) = Step filePath (fmap f producer)
+
+partition
+    :: Monad m => [FilePath] -> Producer (Maybe a) m () -> FreeT (Step a m) m ()
+partition []                   _ = return ()
+partition (filePath:filePaths) p = FreeT $ do
+    x <- catMaybes p
+    case x of
+        Left  r -> return $ Pure r
+        Right p' -> return $ Free $ Step filePath $ do
+            p'' <- p'
+            return (partition filePaths p'')
+
+catMaybes
+    :: Monad m
+    => Producer (Maybe a) m r
+    -> m (Either r (Producer a m (Producer (Maybe a) m r)))
+catMaybes p0 = do
+    x <- next p0
+    case x of
+        Left   r       -> return $ Left r
+        Right (ma, p1) -> return $ Right $ go (yield ma >> p1)
+  where
+    go p = do
+        x <- lift (next p)
+        case x of
+            Left   r       -> return (return r)
+            Right (ma, p') -> case ma of
+                Nothing -> return p'
+                Just a  -> do
+                    yield a
+                    go p'
 
 emptyErr :: String
 emptyErr = "\
