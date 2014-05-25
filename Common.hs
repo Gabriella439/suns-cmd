@@ -2,7 +2,7 @@
 
 module Common where
 
-import Control.Concurrent.Async (withAsync)
+import Control.Concurrent.Async (withAsync, wait)
 import Control.Error (errLn)
 import Control.Exception (bracket)
 import Control.Monad (void, forM_)
@@ -31,7 +31,7 @@ search
     :: String
     -> [(Double, Int, Int, FilePath)]
     -> (FreeT (Step (T.Text, Integer, T.Text) IO) IO () -> IO r)
-    -> IO ()
+    -> IO r
 search hostName params k = do
     let filePaths = map (\(_, _, _, filePath) -> filePath) params
     (output, input, _seal) <- spawn' Unbounded
@@ -81,7 +81,7 @@ search hostName params k = do
                 (cancelConsumer channel)
                 $ \_ -> do
                     let io = k (partition filePaths (fromInput input))
-                    withAsync io $ \_ -> do
+                    withAsync io $ \a -> do
                         forM_ params $ \(rmsd, numStruct, seed, filePath) -> do
                             pdb <- TIO.readFile filePath
                             let msg = newMsg
@@ -95,6 +95,7 @@ search hostName params k = do
                                     , msgCorrelationID = Just uIDtxt
                                     }
                             publishMsg channel requestExchange "1.0.0" msg
+                        wait a
 
 callback
     :: T.Text
