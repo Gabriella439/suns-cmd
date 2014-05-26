@@ -79,20 +79,26 @@ main :: IO ()
 main = withSocketsDo $ do
     Options hostName rmsd numStruct seed directory inputFiles <-
         execParser parserInfo
+
     let step (Step filePath p) = do
             let filePath' = F.decodeString filePath
                 base      = F.basename filePath'
+                dirName = directory </> base
+
+            F.createDirectory True dirName
             m <- runEffect $ for p $ \(pdbID, n, pdbStr) -> liftIO $ do
                 let fileName =
-                            directory
-                        </> base
+                            dirName
                         </> F.decodeString (T.unpack pdbID ++ "_" ++ show n)
                         <.> "pdb"
+
                 F.writeTextFile fileName pdbStr
             m
-    let params =
+
+        params =
             map
                 (\inputFile ->
                     (rmsd, numStruct, seed, F.encodeString inputFile) )
                 inputFiles
+
     search hostName params (iterT step)
