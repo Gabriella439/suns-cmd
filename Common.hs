@@ -104,8 +104,8 @@ parameters = map (\(x, filePath, y) -> (x, "test/" ++ filePath, y))
         "\157k'\201\133yo\166\139\211\139*U\n\180K"            )
     , (0.2, "figure2/search2.pdb",
         "\242\140\DC2-\238\186\196H\155q\SO\201\238p\221\201"  )
-    , (0.3, "figure2/search2.pdb",
-        "0\SYNQ\255\152\206\234\229\224\242\US\235\132f\188|"  )
+    , (0.3, "figure2/search3.pdb",
+        "\147\DC1\233A\DC4_u>\142\ENQ\205\221\231&\210\SO"     )
     , (0.1, "figure3and4B/search1.pdb",
         "\183\246N\181\169}p\US\241s\169K\209\DLE\214r"        )
     , (0.2, "figure3and4B/search2.pdb",
