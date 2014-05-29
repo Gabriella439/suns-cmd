@@ -45,6 +45,30 @@ This test requires a network connection because it sends the searches to the
 official search engine hosted at `suns.degradolab.org`.  You can find the
 test input structures in the `test` directory.
 
+# Benchmarking
+
+To run benchmarks:
+
+    cabal configure --enable-benchmarks
+    cabal build
+    cabal bench
+
+You can optionally provide benchmark options, using the `--benchmark-options`
+flag:
+
+    cabal bench --benchmark-options="--hostname 127.0.01"
+
+These are the full set of available options:
+
+    Usage: bench [--hostname STRING] [-r|--rmsd DOUBLE] [-n|--num INT]
+      Send search requests and store results as PDB files
+    
+    Available options:
+      -h,--help                Show this help text
+      --hostname STRING        Search engine address (default: suns.degradolab.org)
+      -r,--rmsd DOUBLE         Override RMSD cutoff (default: 1.0)
+      -n,--num INT             Number of results (default: 100)
+
 ## Support
 
 To report bugs, request features, or ask for support, contact the official
