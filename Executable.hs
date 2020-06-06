@@ -1,12 +1,11 @@
 {-# LANGUAGE OverloadedStrings, TypeFamilies #-}
 
 import Control.Monad.Trans.Free (iterT)
-import Data.Monoid (mconcat)
 import qualified Data.Text as T
 import qualified Filesystem.Path.CurrentOS as F
 import Filesystem.Path ((</>), (<.>))
 import qualified Filesystem as F
-import Network (withSocketsDo)
+import Network.Socket (withSocketsDo)
 import Options.Applicative
 import Pipes
 import Common (search, Step(..))
@@ -23,13 +22,13 @@ data Options = Options
 options :: Parser Options
 options = Options
     <$> strOption (mconcat
-	[ long "hostname"
-	, value "suns.degradolab.org"
-	, showDefaultWith id
-	, metavar "STRING"
-	, help "Search engine address"
-	] )
-    <*> option (mconcat
+        [ long "hostname"
+        , value "suns.degradolab.org"
+        , showDefaultWith id
+        , metavar "STRING"
+        , help "Search engine address"
+        ] )
+    <*> option auto (mconcat
         [ short 'r'
         , long "rmsd"
         , value 1.0
@@ -37,7 +36,7 @@ options = Options
         , metavar "DOUBLE"
         , help "RMSD cutoff"
         ] )
-    <*> option (mconcat
+    <*> option auto (mconcat
         [ short 'n'
         , long "num"
         , value 100
@@ -45,7 +44,7 @@ options = Options
         , metavar "INT"
         , help "Number of results"
         ] )
-    <*> option (mconcat
+    <*> option auto (mconcat
         [ short 's'
         , long "seed"
         , value 0
@@ -53,16 +52,15 @@ options = Options
         , metavar "INT"
         , help "Randomization seed"
         ] )
-    <*> nullOption (mconcat
+    <*> option (fmap F.decodeString str) (mconcat
         [ short 'd'
         , long "directory"
         , value "."
         , showDefaultWith F.encodeString
         , metavar "DIRECTORY"
         , help "Results directory"
-        , reader (Right . F.decodeString)
         ] )
-    <*> many (argument (Just . F.decodeString) (mconcat
+    <*> many (argument (fmap F.decodeString str) (mconcat
         [ metavar "PDBFILE"
         , help "Input file"
         ] ))

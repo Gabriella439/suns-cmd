@@ -3,12 +3,11 @@
 import qualified Data.ByteString as BS
 import Crypto.Types (BitLength)
 import Data.Digest.Pure.MD5
-import Data.Monoid ((<>))
 import Data.Serialize (encode)
 import Data.Tagged (Tagged(unTagged))
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
-import Network (withSocketsDo)
+import Network.Socket (withSocketsDo)
 import Pipes
 import Pipes.ByteString (chunksOf')
 import Pipes.Group

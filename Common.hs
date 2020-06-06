@@ -5,8 +5,9 @@ module Common where
 import Control.Concurrent.Async (withAsync, wait)
 import Control.Error (errLn)
 import Control.Exception (bracket)
-import Control.Monad (void, forM_)
+import Control.Monad (forM_)
 import Data.Aeson ((.=), object, encode)
+import Data.Text (Text)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef (IORef, newIORef, readIORef, modifyIORef)
@@ -34,7 +35,7 @@ search
     -> IO r
 search hostName params k = do
     let filePaths = map (\(_, _, _, filePath) -> filePath) params
-    (output, input, _seal) <- spawn' Unbounded
+    (output, input, _seal) <- spawn' unbounded
     bracket
         (openConnection hostName "suns-vhost" "suns-client" "suns-client")
         closeConnection
@@ -160,7 +161,7 @@ callback uIDtxt used output done (message, _envelope) =
                              errLn "Server time limit exceeded"
                              done
                         '3' -> do
-                             errLn $ "Server Error: " ++ B.unpack rest
+                             errLn $ "Server Error: " <> T.pack (B.unpack rest)
                              done
                         _   -> do
                              errLn $ invalidErr body
@@ -202,16 +203,16 @@ catMaybes p0 = do
                     yield a
                     go p'
 
-emptyErr :: String
+emptyErr :: Text
 emptyErr = "\
  \suns-cmd received an invalid empty message from the Suns server.  Contact\n\
  \the Suns server administrator and provide them with this error message to\n\
  \fix this problem\n"
 
-invalidErr :: B.ByteString -> String
+invalidErr :: B.ByteString -> Text
 invalidErr bs = "\
  \suns-cmd received an invalid response from the Suns server.  Contact the\n\
  \Suns server administrator and provide them with this error message and the\n\
  \following data:\n"
- ++ show (B.take 256 bs)
- ++ if (B.length bs > 256) then "..." else ""
+ <> T.pack (show (B.take 256 bs))
+ <> if (B.length bs > 256) then "..." else ""

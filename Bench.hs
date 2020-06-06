@@ -1,5 +1,4 @@
 import Control.Monad.Trans.Free hiding (Pure)
-import Data.Monoid (mconcat)
 import Data.Maybe (fromMaybe)
 import Data.IORef
 import Options.Applicative
@@ -12,13 +11,13 @@ import Common (Step(..), search, parameters)
 options :: Parser (String, Maybe Double, Int)
 options = (,,)
     <$> strOption (mconcat
-	[ long "hostname"
-	, value "suns.degradolab.org"
-	, showDefaultWith id
-	, metavar "STRING"
-	, help "Search engine address"
-	] )
-    <*> optional (option (mconcat
+        [ long "hostname"
+        , value "suns.degradolab.org"
+        , showDefaultWith id
+        , metavar "STRING"
+        , help "Search engine address"
+        ] )
+    <*> optional (option auto (mconcat
         [ short 'r'
         , long "rmsd"
         , value 1.0
@@ -26,7 +25,7 @@ options = (,,)
         , metavar "DOUBLE"
         , help "Override RMSD cutoff"
         ] ))
-    <*> option (mconcat
+    <*> option auto (mconcat
         [ short 'n'
         , long "num"
         , value 100
