@@ -4,10 +4,10 @@ Cabal-Version: >= 1.14.0
 Build-Type: Simple
 License: BSD3
 License-File: LICENSE
-Copyright: 2013 Gabriel Gonzalez
-Author: Gabriel Gonzalez
-Maintainer: Gabriel439@gmail.com
-Bug-Reports: https://github.com/Gabriel439/suns-cmd/issues
+Copyright: 2013 Gabriella Gonzalez
+Author: Gabriella Gonzalez
+Maintainer: GenuineGabriella@gmail.com
+Bug-Reports: https://github.com/Gabriella439/suns-cmd/issues
 Synopsis: Command line client to the Suns protein search engine
 Description: This package provides a simple command line client that you can
   use to automate searches to a Suns search engine.  Installing this package
@@ -31,7 +31,7 @@ Description: This package provides a simple command line client that you can
 Category: Network, Science, Command Line
 Source-Repository head
     Type: git
-    Location: https://github.com/Gabriel439/suns-cmd
+    Location: https://github.com/Gabriella439/suns-cmd
 
 Executable suns-cmd
     Main-Is: Executable.hs
